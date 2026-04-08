@@ -549,8 +549,6 @@ tbody td { padding: 7px 10px; color: var(--text); white-space: nowrap; font-size
           <option value="THF">THF (Tetrahydrofuran)</option>
           <option value="EtOH">EtOH (Ethanol)</option>
           <option value="DEA">DEA (Diethylamine)</option>
-          <option value="Indole">Indole (인돌)</option>
-          <option value="Skatole">Skatole (스카톨)</option>
         </optgroup>
         <optgroup label="── 기타 ──">
           <option value="Other">Other</option>
@@ -949,7 +947,7 @@ tbody td { padding: 7px 10px; color: var(--text); white-space: nowrap; font-size
 
 <script>
 const state = {
-  data:{x:[],y:[]}, baseline:{x:[],y:[],range:null}, reaction:{x:[],y:[],range:null}, sairH2oPpm:null,
+  data:{x:[],y:[]}, baseline:{x:[],y:[],range:null}, reaction:{x:[],y:[],range:null}, sairH2oPpm:null, baselineGases:[],
   mode:null, driftCorrection:false, results:[], resultCount:0,
   metrics:{r0:null,noise:null,dr:null,k:null,lod:null,loq:null}
 };
@@ -1344,7 +1342,7 @@ function buildChartLayout(xIsDate){
     annotations.push({
       x: midX(x0,x1),
       y:1, yref:'paper', xref:'x',
-      text:`<b>${balGas}</b><br>H₂O: ${state.sairH2oPpm!=null ? state.sairH2oPpm.toLocaleString()+' ppm' : h2oPpm2.toLocaleString()+' ppm (env)'}<br>Noise: ${noiseStr}`,
+      text:`<b>${balGas}</b><br>H₂O: ${state.sairH2oPpm!=null ? state.sairH2oPpm.toLocaleString()+' ppm' : h2oPpm2.toLocaleString()+' ppm (env)'}${(state.baselineGases&&state.baselineGases.length)?'<br>'+state.baselineGases.map(g=>`${g.name}: ${g.ppm.toLocaleString()} ppm`).join('<br>'):''}  <br>Noise: ${noiseStr}`,
       showarrow:false, font:{size:10,color:'#0ca678',family:'Inter,Noto Sans KR'},
       align:'center', yanchor:'top',
       bgcolor:'rgba(240,253,249,0.95)', bordercolor:'rgba(18,184,134,0.5)', borderwidth:1, borderpad:5
@@ -1430,27 +1428,65 @@ function openSairModal(selY){
   const curRh   = parseFloat(document.getElementById('rh-input').value)||50;
   document.getElementById('sair-temp').value = curTemp;
   document.getElementById('sair-rh').value   = curRh;
-  // 이전 값 있으면 그대로 유지, 없으면 env 기준
   if(state.sairH2oPpm != null){
     document.getElementById('sair-ppm-direct').value = state.sairH2oPpm;
   }
-  // 부제목에 현재 가스 표시
   const balGas = document.getElementById('balance-gas').value || '';
   const sub = document.getElementById('sair-modal-sub');
-  if(sub) sub.textContent = `${balGas} — 이 구간의 수분 농도를 입력하세요`;
+  if(sub) sub.textContent = `${balGas} — 이 구간의 기체 조건을 입력하세요`;
   sairCalcPpm();
   sairTab('rh');
+  // 이전 추가 기체 복원
+  renderExtraGasList(state.baselineGases||[]);
   document.getElementById('sair-modal').style.display = 'flex';
 }
 
+let _extraGasId = 0;
+function addExtraGasRow(name='', ppm=''){
+  _extraGasId++;
+  const id = _extraGasId;
+  const row = document.createElement('div');
+  row.id = 'extra-gas-row-'+id;
+  row.style.cssText = 'display:flex;gap:6px;align-items:center';
+  row.innerHTML = `
+    <input type="text" placeholder="기체명 (예: EtOH, Toluene)" value="${name}"
+      style="flex:2;padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;outline:none">
+    <input type="number" placeholder="ppm" value="${ppm}" min="0"
+      style="flex:1;padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;outline:none">
+    <button onclick="document.getElementById('extra-gas-row-${id}').remove()"
+      style="padding:6px 10px;border-radius:8px;border:1px solid #fecaca;background:#fff5f5;color:#e03131;font-size:13px;cursor:pointer;flex-shrink:0">✕</button>
+  `;
+  document.getElementById('extra-gas-list').appendChild(row);
+}
+function renderExtraGasList(gases){
+  document.getElementById('extra-gas-list').innerHTML = '';
+  _extraGasId = 0;
+  gases.forEach(g=>addExtraGasRow(g.name, g.ppm));
+}
+function collectExtraGases(){
+  const rows = document.getElementById('extra-gas-list').children;
+  const result = [];
+  for(const row of rows){
+    const inputs = row.querySelectorAll('input');
+    const name = inputs[0].value.trim();
+    const ppm  = parseFloat(inputs[1].value)||0;
+    if(name) result.push({name, ppm});
+  }
+  return result;
+}
+
 function sairTab(tab){
-  const isRh = tab === 'rh';
-  document.getElementById('sair-panel-rh').style.display  = isRh ? 'flex' : 'none';
-  document.getElementById('sair-panel-ppm').style.display = isRh ? 'none'  : 'flex';
-  const activeStyle   = 'flex:1;padding:7px;border-radius:8px;border:1.5px solid #7c3aed;background:#ede9fe;color:#7c3aed;font-size:12px;font-weight:700;cursor:pointer';
-  const inactiveStyle = 'flex:1;padding:7px;border-radius:8px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#94a3b8;font-size:12px;font-weight:700;cursor:pointer';
-  document.getElementById('sair-tab-rh').style.cssText  = isRh ? activeStyle : inactiveStyle;
-  document.getElementById('sair-tab-ppm').style.cssText = isRh ? inactiveStyle : activeStyle;
+  ['rh','ppm','none'].forEach(t=>{
+    const panel = document.getElementById('sair-panel-'+t);
+    if(panel) panel.style.display = (t===tab) ? (t==='none'?'block':'flex') : 'none';
+    const btn = document.getElementById('sair-tab-'+t);
+    if(btn){
+      const active = t===tab;
+      btn.style.cssText = active
+        ? `flex:1;padding:6px;border-radius:8px;border:1.5px solid #7c3aed;background:#ede9fe;color:#7c3aed;font-size:11px;font-weight:700;cursor:pointer`
+        : `flex:1;padding:6px;border-radius:8px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#94a3b8;font-size:11px;font-weight:700;cursor:pointer`;
+    }
+  });
   document.getElementById('sair-modal')._activeTab = tab;
 }
 
@@ -1474,18 +1510,20 @@ function sairModalCancel(){
 
 function sairModalConfirm(){
   if(!_sairPendingY) return;
-  const modal  = document.getElementById('sair-modal');
-  const tab    = modal._activeTab || 'rh';
-  const h2oPpm = tab === 'ppm'
-    ? (parseInt(document.getElementById('sair-ppm-direct').value)||0)
-    : (modal._calcPpm || 0);
-  state.sairH2oPpm = h2oPpm;
+  const modal = document.getElementById('sair-modal');
+  const tab   = modal._activeTab || 'rh';
+  let h2oPpm  = null;
+  if(tab==='rh')  h2oPpm = modal._calcPpm||0;
+  if(tab==='ppm') h2oPpm = parseInt(document.getElementById('sair-ppm-direct').value)||0;
+  // tab==='none' → h2oPpm 유지 null
+  state.sairH2oPpm    = h2oPpm;
+  state.baselineGases = collectExtraGases();
   modal.style.display = 'none';
-  calculateBaseline(_sairPendingY, h2oPpm);
+  calculateBaseline(_sairPendingY, h2oPpm, state.baselineGases);
   _sairPendingY = null;
 }
 
-function calculateBaseline(selY, h2oPpm){
+function calculateBaseline(selY, h2oPpm, extraGases){
   const r0   = Math.max(...selY);
   const absN = sd(selY);
   const relN = absN / r0;
@@ -1494,8 +1532,9 @@ function calculateBaseline(selY, h2oPpm){
   state.metrics.noise    = relN;
   setMetric('metric-r0','rc-r0', fmtV(r0,'Ω'));
   setMetric('metric-noise','rc-noise', relN.toExponential(3));
-  const h2oStr = (h2oPpm != null) ? ` · H₂O: ${h2oPpm.toLocaleString()} ppm` : '';
-  document.getElementById('rp-baseline-badge').textContent=`Baseline: n=${selY.length}, R₀(max)=${fmtV(r0,'Ω')}, σ/R₀=${relN.toExponential(3)}${h2oStr}`;
+  const h2oStr = (h2oPpm!=null) ? ` · H₂O: ${h2oPpm.toLocaleString()} ppm` : '';
+  const extraStr = (extraGases&&extraGases.length) ? ' · '+extraGases.map(g=>`${g.name}: ${g.ppm.toLocaleString()} ppm`).join(' · ') : '';
+  document.getElementById('rp-baseline-badge').textContent=`Baseline: n=${selY.length}, R₀(max)=${fmtV(r0,'Ω')}, σ/R₀=${relN.toExponential(3)}${h2oStr}${extraStr}`;
   document.getElementById('rp-baseline-badge').style.color='var(--green)';
   setStep(3);
   updateSaveBtn();
@@ -1847,7 +1886,7 @@ function exportCSV(){
   showNotification('CSV 내보내기 완료','success');
 }
 function clearAll(){
-  state.data={x:[],y:[]};state.baseline={x:[],y:[],range:null};state.reaction={x:[],y:[],range:null};state.reactions=[];state.sairH2oPpm=null;
+  state.data={x:[],y:[]};state.baseline={x:[],y:[],range:null};state.reaction={x:[],y:[],range:null};state.reactions=[];state.sairH2oPpm=null;state.baselineGases=[];
   state.mode=null;document.getElementById('raw-input').value='';
   document.getElementById('btn-baseline').className='mode-btn';
   document.getElementById('btn-reaction').className='mode-btn';
@@ -2386,51 +2425,63 @@ renderChemTable();
 // ══════════════════════════════════════════════════════════════
 </script>
 
-<!-- Baseline 수분농도 입력 모달 -->
+<!-- Baseline 기체 조건 입력 모달 -->
 <div id="sair-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,0.45);backdrop-filter:blur(4px);align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:16px;padding:28px 32px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.2);border:1px solid #e2e8f0">
+  <div style="background:#fff;border-radius:16px;padding:28px 32px;width:460px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);border:1px solid #e2e8f0">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
-      <span style="font-size:24px">💧</span>
+      <span style="font-size:24px">🧪</span>
       <div>
-        <div style="font-size:15px;font-weight:700;color:#1e293b">Baseline 수분 농도 설정</div>
-        <div style="font-size:11px;color:#94a3b8;margin-top:2px" id="sair-modal-sub">Baseline 구간의 수분 조건을 입력하세요</div>
+        <div style="font-size:15px;font-weight:700;color:#1e293b">Baseline 기체 조건 설정</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:2px" id="sair-modal-sub">이 구간의 배경 기체 조건을 입력하세요</div>
       </div>
     </div>
-    <!-- 탭 -->
-    <div style="display:flex;gap:6px;margin-bottom:16px">
-      <button id="sair-tab-rh"  onclick="sairTab('rh')"  style="flex:1;padding:7px;border-radius:8px;border:1.5px solid #7c3aed;background:#ede9fe;color:#7c3aed;font-size:12px;font-weight:700;cursor:pointer">🌡 온도 + RH</button>
-      <button id="sair-tab-ppm" onclick="sairTab('ppm')" style="flex:1;padding:7px;border-radius:8px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#94a3b8;font-size:12px;font-weight:700;cursor:pointer">💧 ppm 직접 입력</button>
+
+    <!-- ── 수분 농도 섹션 ── -->
+    <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px;padding-bottom:4px;border-bottom:1.5px solid #e2e8f0">
+      💧 수분 농도 (H₂O)
     </div>
-    <!-- RH 패널 -->
-    <div id="sair-panel-rh" style="display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <button id="sair-tab-rh"  onclick="sairTab('rh')"  style="flex:1;padding:6px;border-radius:8px;border:1.5px solid #7c3aed;background:#ede9fe;color:#7c3aed;font-size:11px;font-weight:700;cursor:pointer">🌡 온도+RH 계산</button>
+      <button id="sair-tab-ppm" onclick="sairTab('ppm')" style="flex:1;padding:6px;border-radius:8px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#94a3b8;font-size:11px;font-weight:700;cursor:pointer">💧 ppm 직접 입력</button>
+      <button id="sair-tab-none" onclick="sairTab('none')" style="flex:1;padding:6px;border-radius:8px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#94a3b8;font-size:11px;font-weight:700;cursor:pointer">⬜ 미입력</button>
+    </div>
+    <div id="sair-panel-rh" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
       <div style="display:flex;gap:10px">
         <div style="flex:1">
-          <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:4px">온도 (°C)</div>
-          <input id="sair-temp" type="number" value="25" step="0.1"
-            style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;outline:none;box-sizing:border-box"
-            oninput="sairCalcPpm()">
+          <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:3px">온도 (°C)</div>
+          <input id="sair-temp" type="number" value="25" step="0.1" oninput="sairCalcPpm()"
+            style="width:100%;padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box">
         </div>
         <div style="flex:1">
-          <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:4px">상대습도 RH (%)</div>
-          <input id="sair-rh" type="number" value="50" step="0.1" min="0" max="100"
-            style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;outline:none;box-sizing:border-box"
-            oninput="sairCalcPpm()">
+          <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:3px">상대습도 RH (%)</div>
+          <input id="sair-rh" type="number" value="50" step="0.1" min="0" max="100" oninput="sairCalcPpm()"
+            style="width:100%;padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box">
         </div>
       </div>
-      <div style="background:#f5f3ff;border-radius:8px;padding:12px;text-align:center">
-        <div style="font-size:11px;color:#7c3aed;margin-bottom:2px">계산된 수분 농도</div>
-        <span id="sair-ppm-preview" style="font-size:26px;font-weight:800;color:#7c3aed">11,605</span>
-        <span style="font-size:13px;color:#7c3aed;font-weight:600"> ppm H₂O</span>
+      <div style="background:#f5f3ff;border-radius:8px;padding:10px;text-align:center">
+        <span style="font-size:11px;color:#7c3aed">계산된 수분 농도 → </span>
+        <span id="sair-ppm-preview" style="font-size:20px;font-weight:800;color:#7c3aed">11,605</span>
+        <span style="font-size:12px;color:#7c3aed;font-weight:600"> ppm H₂O</span>
       </div>
     </div>
-    <!-- ppm 직접입력 패널 -->
-    <div id="sair-panel-ppm" style="display:none;flex-direction:column;gap:10px">
-      <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:4px">수분 농도 (ppm H₂O)</div>
+    <div id="sair-panel-ppm" style="display:none;flex-direction:column;gap:8px;margin-bottom:12px">
+      <div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:3px">수분 농도 (ppm H₂O)</div>
       <input id="sair-ppm-direct" type="number" placeholder="예: 11605"
-        style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;outline:none;box-sizing:border-box">
+        style="width:100%;padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box">
     </div>
+    <div id="sair-panel-none" style="display:none;margin-bottom:12px">
+      <div style="font-size:11px;color:#94a3b8;padding:8px 0">수분 농도를 입력하지 않습니다.</div>
+    </div>
+
+    <!-- ── 추가 기체 섹션 ── -->
+    <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px;padding-bottom:4px;border-bottom:1.5px solid #e2e8f0;margin-top:4px">
+      ⚗️ 추가 기체 농도 <span style="font-size:10px;font-weight:400;color:#94a3b8">(선택, 여러 개 가능)</span>
+    </div>
+    <div id="extra-gas-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px"></div>
+    <button onclick="addExtraGasRow()" style="width:100%;padding:7px;border-radius:8px;border:1.5px dashed #cbd5e1;background:#f8fafc;color:#64748b;font-size:12px;font-weight:600;cursor:pointer">+ 기체 추가</button>
+
     <!-- 버튼 -->
-    <div style="display:flex;gap:8px;margin-top:20px">
+    <div style="display:flex;gap:8px;margin-top:18px">
       <button onclick="sairModalCancel()" style="flex:1;padding:10px;border-radius:8px;border:1.5px solid #e2e8f0;background:#f8fafc;color:#64748b;font-size:13px;font-weight:600;cursor:pointer">취소</button>
       <button onclick="sairModalConfirm()" style="flex:2;padding:10px;border-radius:8px;border:none;background:#7c3aed;color:#fff;font-size:14px;font-weight:700;cursor:pointer">✅ 적용</button>
     </div>
