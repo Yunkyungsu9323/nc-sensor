@@ -1364,10 +1364,11 @@ function buildChartLayout(xIsDate){
     const lodStr=lod2!=null?lod2.toFixed(2)+' ppm':'─';
     const loq2=lod2!=null?lod2*10/3:null;
     const loqStr=loq2!=null?loq2.toFixed(2)+' ppm':'─';
+    const deltaRStr=r0!=null?fmtV(rMax2-r0,'Ω'):'─';
     annotations.push({
       x:midX(x0,x1),
       y:1,yref:'paper',xref:'x',
-      text:`<b>${rxn.gasType} ${rxn.conc} ppm</b><br>k: ${kStr}<br>LOD: ${lodStr}<br>LOQ: ${loqStr}`,
+      text:`<b>${rxn.gasType} ${rxn.conc} ppm</b><br>ΔR: ${deltaRStr}<br>k: ${kStr}<br>LOD: ${lodStr}<br>LOQ: ${loqStr}`,
       showarrow:false,font:{size:10,color:'#d97706',family:'Inter,Noto Sans KR'},
       align:'center',yanchor:'top',
       bgcolor:'rgba(255,251,235,0.95)',bordercolor:'rgba(245,159,0,0.5)',borderwidth:1,borderpad:5
@@ -1584,6 +1585,7 @@ function renderReactionMetrics(){
       <div class="reaction-metric-card-header">
         ⚡ Reaction #${i+1} — <span style="color:var(--text)">${rxn.gasType}</span>
         <span style="font-size:11px;font-weight:400;color:var(--text-sm)">${rxn.conc} ppm · n=${rxn.x.length}</span>
+        <span style="font-size:10px;font-weight:600;color:var(--amber);margin-left:6px">ΔR = ${drAbs}</span>
         <button onclick="removeReaction('${rxn.id}')" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text-sm);font-size:13px;padding:0 4px" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text-sm)'">✕</button>
       </div>
       <div class="result-grid" style="grid-template-columns:repeat(4,1fr)">
