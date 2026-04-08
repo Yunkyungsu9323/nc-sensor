@@ -1291,6 +1291,8 @@ function handleSelection(eventData){
   if(state.mode==='baseline'){
     state.baseline={x:selX,y:selY,range};
     openSairModal(selY);
+    updateSelectionInfo();
+    // updateChartOverlays는 모달 confirm 후 calculateBaseline에서 호출
   } else {
     const gasType=document.getElementById('gas-type').value;
     const conc=parseFloat(document.getElementById('gas-conc').value)||0;
@@ -1299,8 +1301,8 @@ function handleSelection(eventData){
     state.reaction={x:selX,y:selY,range};
     calculateReaction(selY,conc);
     renderReactionList();
+    updateSelectionInfo();updateChartOverlays();
   }
-  updateSelectionInfo();updateChartOverlays();
 }
 // Update only trace overlays without re-initializing chart (preserves event listeners)
 function buildChartLayout(xIsDate){
@@ -1541,6 +1543,7 @@ function calculateBaseline(selY, h2oPpm, extraGases){
   setStep(3);
   updateSaveBtn();
   recalcK();
+  if(chartInitialized) updateChartOverlays();
 }
 function calculateReaction(selY, concOverride){
   if(state.metrics.r0===null){showNotification('먼저 Baseline 구간을 선택하세요','error');return;}
