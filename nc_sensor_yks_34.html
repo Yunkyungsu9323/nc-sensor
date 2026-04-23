@@ -551,6 +551,7 @@ tbody td { padding: 7px 10px; color: var(--text); white-space: nowrap; font-size
           <option value="CO">CO (Carbon monoxide)</option>
           <option value="H2O">H₂O (Water vapor)</option>
           <option value="SO2">SO₂ (Sulfur dioxide)</option>
+          <option value="CO2">CO₂ (Carbon dioxide)</option>
         </optgroup>
         <optgroup label="── VOC ──">
           <option value="Hexane">Hexane (n-Hexane)</option>
@@ -2035,6 +2036,8 @@ function switchTab(tab) {
 // VOC PPM 계산기 데이터
 // ══════════════════════════════════════════════
 let chemDB = [
+  {name:"이산화탄소 (CO₂)", mw:44.010, density:1.977, purity:99.9, bp:"-78.5 °C (승화)", flam:"없음 (불연성)", tox:"고농도 시 두통·어지러움·질식, 밀폐공간 위험", note:"무색무취 — 농도계 없이 감지 불가, 밀폐공간 진입 금지",
+   twa:5000, stel:30000, idlh:40000, oelNote:"TWA 5,000 ppm (한국·ACGIH). 자체 독성 낮으나 산소 치환으로 질식 위험. IDLH 40,000 ppm."},
   {name:"물 (Water)",      mw:18.015, density:1.000, purity:100.0, bp:"100.0 °C", flam:"없음",        tox:"거의 없음",                                                         note:"전기 기구 접촉 주의",
    twa:null, stel:null, idlh:null, oelNote:"노출기준 미설정 (비독성)"},
   {name:"에탄올 (Ethanol)", mw:46.070, density:0.789, purity:95.0,  bp:"78.4 °C",  flam:"높음",         tox:"눈 자극, 장기 노출 시 간 손상",                                       note:"화기 엄금",
