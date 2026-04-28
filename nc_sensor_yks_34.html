@@ -821,6 +821,61 @@ tbody td { padding: 7px 10px; color: var(--text); white-space: nowrap; font-size
       </div>
     </div>
 
+
+    <!-- 기체 희석 계산기 -->
+    <div class="section-title" style="margin-top:18px">5. 표준 가스 희석 계산기 <span style="font-size:11px;font-weight:400;color:var(--text-sm)">— 주사기로 채취 후 챔버 희석</span></div>
+    <div class="card" style="margin-bottom:14px">
+      <div style="font-size:11px;color:var(--text-sm);margin-bottom:14px;line-height:1.7">
+        💡 고압 표준가스 실린더 → 200mL 주사기로 채취 → 챔버(Air)에 주입하여 희석<br>
+        계산식: <b>주입량(mL) = 목표농도(ppm) × 공기부피(L) / 표준가스농도(ppm)</b>
+      </div>
+
+      <!-- 표준가스 선택 -->
+      <div style="margin-bottom:14px">
+        <div style="font-size:12px;font-weight:700;color:var(--text-md);margin-bottom:8px">표준 가스 선택</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap" id="std-gas-buttons"></div>
+      </div>
+
+      <!-- 입력 조건 -->
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px">
+        <div class="form-group">
+          <label>공기 부피 (L)</label>
+          <input type="number" id="gd-chamber" value="0.012" step="0.001" min="0" style="width:110px" oninput="calcGasDilution()">
+        </div>
+        <div class="form-group">
+          <label>목표 농도 (ppm)</label>
+          <input type="number" id="gd-target" value="50" step="1" min="0" style="width:110px" oninput="calcGasDilution()">
+        </div>
+        <div class="form-group">
+          <label>주사기 용량 (mL)</label>
+          <input type="number" id="gd-syringe" value="200" step="10" min="0" style="width:110px" oninput="calcGasDilution()">
+        </div>
+      </div>
+
+      <!-- 결과 -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px" id="gd-result-area" style="display:none">
+        <div style="background:var(--primary-lt);border:1.5px solid var(--primary);border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:11px;color:var(--primary);font-weight:700;margin-bottom:4px">💉 주사기 채취량</div>
+          <div style="font-size:32px;font-weight:800;color:var(--primary)" id="gd-inject-vol">─</div>
+          <div style="font-size:13px;color:var(--primary);font-weight:600">mL</div>
+          <div style="font-size:10px;color:var(--text-sm);margin-top:4px" id="gd-inject-note"></div>
+        </div>
+        <div style="background:#f0fdf4;border:1.5px solid var(--green);border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:11px;color:var(--green);font-weight:700;margin-bottom:4px">✅ 실제 챔버 농도</div>
+          <div style="font-size:32px;font-weight:800;color:var(--green)" id="gd-actual-ppm">─</div>
+          <div style="font-size:13px;color:var(--green);font-weight:600">ppm</div>
+        </div>
+        <div style="background:#fff7ed;border:1.5px solid var(--amber);border-radius:10px;padding:14px;text-align:center">
+          <div style="font-size:11px;color:var(--amber);font-weight:700;margin-bottom:4px">📋 희석비</div>
+          <div style="font-size:32px;font-weight:800;color:var(--amber)" id="gd-ratio">─</div>
+          <div style="font-size:13px;color:var(--amber);font-weight:600">배 희석</div>
+        </div>
+      </div>
+
+      <!-- 선택 가스 정보 -->
+      <div id="gd-gas-info" style="display:none;margin-top:12px;background:var(--bg-light);border-radius:8px;padding:12px;font-size:12px;color:var(--text-sm)"></div>
+    </div>
+
     <!-- 안전 정보 -->
     <div class="section-title">4. 물질 안전 정보</div>
     <div class="safety-grid" id="voc-safety-grid">
@@ -2027,7 +2082,7 @@ function switchTab(tab) {
     const sn = document.getElementById('snav-'+t);
     if(sn) sn.classList.toggle('active', t===tab);
   });
-  if(tab==='voc') { renderChemTable(); calcVOC(); syncVocMolVol(); }
+  if(tab==='voc') { renderChemTable(); calcVOC(); syncVocMolVol(); renderStdGasButtons(); }
   if(tab==='solvent') renderSolventTable();
   if(tab==='polymer') renderPolymerTable();
 }
@@ -2466,6 +2521,91 @@ function showPolymerDetail(name) {
 renderChemTable();
 
 // ══════════════════════════════════════════════════════════════
+
+// ══ 표준가스 희석 계산기 ══════════════════════════════════════
+const STD_GASES = [
+  { id:'H2S',  name:'H₂S',  conc_ppm: 5999,    conc_label:'5,999 µmol/mol',  color:'#c05621', twa:1,    stel:5,    idlh:50,   note:'인화성·맹독성. 후드 필수. IDLH 50ppm' },
+  { id:'NH3',  name:'NH₃',  conc_ppm: 6022,    conc_label:'6,022 µmol/mol',  color:'#2b6cb0', twa:25,   stel:35,   idlh:300,  note:'자극성·부식성. 눈·호흡기 보호' },
+  { id:'CO2',  name:'CO₂',  conc_ppm: 5989,    conc_label:'5,989 µmol/mol',  color:'#276749', twa:5000, stel:30000,idlh:40000,note:'질식성. 밀폐공간 주의' },
+  { id:'NO2',  name:'NO₂',  conc_ppm: 9900,    conc_label:'0.99 cmol/mol',   color:'#9b2c2c', twa:3,    stel:5,    idlh:20,   note:'강산화제·폐독성. 즉시 후드 사용' },
+  { id:'SO2',  name:'SO₂',  conc_ppm: 50000,   conc_label:'5 cmol/mol',      color:'#6b46c1', twa:2,    stel:5,    idlh:100,  note:'부식성·자극성. 호흡기 보호 필수' },
+];
+
+let _gdSelected = null;
+
+function renderStdGasButtons(){
+  const el = document.getElementById('std-gas-buttons');
+  if(!el) return;
+  el.innerHTML = STD_GASES.map(g=>`
+    <button id="gd-btn-${g.id}" onclick="selectStdGas('${g.id}')"
+      style="padding:8px 16px;border-radius:8px;border:2px solid ${g.color}30;background:#fff;
+             color:${g.color};font-size:13px;font-weight:700;cursor:pointer;transition:all 0.15s">
+      ${g.name}
+    </button>`).join('');
+}
+
+function selectStdGas(id){
+  _gdSelected = STD_GASES.find(g=>g.id===id);
+  STD_GASES.forEach(g=>{
+    const btn = document.getElementById('gd-btn-'+g.id);
+    if(!btn) return;
+    const active = g.id===id;
+    btn.style.background = active ? _gdSelected.color : '#fff';
+    btn.style.color = active ? '#fff' : g.color;
+    btn.style.borderColor = active ? g.color : g.color+'30';
+  });
+  // 가스 정보 표시
+  const info = document.getElementById('gd-gas-info');
+  if(info && _gdSelected){
+    info.style.display='block';
+    info.innerHTML = `<b>${_gdSelected.name}</b> 표준가스 농도: <b>${_gdSelected.conc_label}</b> &nbsp;|&nbsp;
+      TWA: <b>${_gdSelected.twa} ppm</b> &nbsp;|&nbsp; STEL: <b>${_gdSelected.stel} ppm</b> &nbsp;|&nbsp;
+      IDLH: <b>${_gdSelected.idlh} ppm</b><br>
+      <span style="color:#9a1212">⚠️ ${_gdSelected.note}</span>`;
+  }
+  document.getElementById('gd-result-area').style.display='grid';
+  calcGasDilution();
+}
+
+function calcGasDilution(){
+  if(!_gdSelected) return;
+  const chamberL  = parseFloat(document.getElementById('gd-chamber').value)||0.012;
+  const targetPpm = parseFloat(document.getElementById('gd-target').value)||50;
+  const syringeML = parseFloat(document.getElementById('gd-syringe').value)||200;
+  const stdPpm    = _gdSelected.conc_ppm;
+
+  // 필요 주입량 (mL) = targetPpm × chamberL(L→mL×1000) / stdPpm
+  const chamberML   = chamberL * 1000;
+  const injectML    = (targetPpm * chamberML) / stdPpm;
+  const actualPpm   = (injectML * stdPpm) / chamberML;
+  const ratio       = stdPpm / targetPpm;
+
+  document.getElementById('gd-inject-vol').textContent = injectML < 0.01
+    ? (injectML * 1000).toFixed(2) + ' µL'  // µL로 표시
+    : injectML.toFixed(3);
+
+  // mL vs µL 단위 처리
+  const volEl = document.getElementById('gd-inject-vol');
+  const noteEl = document.getElementById('gd-inject-note');
+  if(injectML < 0.1){
+    volEl.textContent = (injectML*1000).toFixed(2);
+    volEl.nextSibling && (volEl.nextSibling.textContent='');
+    volEl.parentNode.querySelector('.vr-unit') && (volEl.parentNode.querySelector('.vr-unit').textContent='µL');
+    noteEl.textContent = `= ${injectML.toFixed(4)} mL`;
+  } else {
+    volEl.textContent = injectML.toFixed(3);
+    noteEl.textContent = injectML > syringeML
+      ? `⚠️ 주사기(${syringeML}mL) 초과! 챔버부피 또는 목표농도 조정 필요`
+      : `주사기 ${syringeML}mL 기준 ${(injectML/syringeML*100).toFixed(1)}% 사용`;
+  }
+  if(injectML > syringeML) noteEl.style.color='var(--red)';
+  else noteEl.style.color='var(--text-sm)';
+
+  document.getElementById('gd-actual-ppm').textContent = actualPpm.toFixed(2);
+  document.getElementById('gd-ratio').textContent = ratio >= 1000
+    ? (ratio/1000).toFixed(1)+'k' : Math.round(ratio).toLocaleString();
+}
+
 </script>
 
 <!-- Baseline 기체 조건 입력 모달 -->
