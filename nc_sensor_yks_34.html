@@ -466,6 +466,7 @@ tbody td { padding: 7px 10px; color: var(--text); white-space: nowrap; font-size
   <button class="nav-btn" id="snav-voc" onclick="switchTab('voc')"><span>🧪</span> VOC PPM 계산</button>
   <button class="nav-btn" id="snav-solvent" onclick="switchTab('solvent')"><span>💧</span> 용매 DB</button>
   <button class="nav-btn" id="snav-polymer" onclick="switchTab('polymer')"><span>🧬</span> 고분자 DB</button>
+  <button class="nav-btn" id="snav-multi" onclick="switchTab('multi')"><span>📡</span> 쪽보드 분석</button>
   <hr class="sidebar-divider">
 
   <div class="nav-section">센서 분석 도구</div>
@@ -494,6 +495,7 @@ tbody td { padding: 7px 10px; color: var(--text); white-space: nowrap; font-size
     <button class="tab-btn" id="tab-voc" onclick="switchTab('voc')">🧪 VOC PPM 계산기</button>
     <button class="tab-btn" id="tab-solvent" onclick="switchTab('solvent')">💧 용매 DB</button>
     <button class="tab-btn" id="tab-polymer" onclick="switchTab('polymer')">🧬 고분자 DB</button>
+    <button class="tab-btn" id="tab-multi" onclick="switchTab('multi')">📡 쪽보드 분석</button>
   </div>
 
   <!-- ══ TAB: NC SENSOR ══ -->
@@ -1009,8 +1011,43 @@ tbody td { padding: 7px 10px; color: var(--text); white-space: nowrap; font-size
       </div>
     </div>
 
+  
   </div><!-- /content-polymer -->
 
+  <!-- ═══════════ 쪽보드 분석 탭 ═══════════ -->
+  <div class="tab-content" id="content-multi">
+  <div style="max-width:1100px;margin:0 auto;padding:20px 16px">
+
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">
+      <span style="font-size:26px">📡</span>
+      <div>
+        <div style="font-size:19px;font-weight:800;color:var(--text)">쪽보드 다중 센서 분석</div>
+        <div style="font-size:11px;color:var(--text-sm)">시간;온도;센서1;센서2;... 형식 데이터 → 센서 선택 → 기존 분석 엔진으로 전달</div>
+      </div>
+    </div>
+
+    <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px">
+      <div style="font-size:13px;font-weight:700;color:var(--text-md);margin-bottom:8px">데이터 입력</div>
+      <div style="font-size:11px;color:var(--text-sm);margin-bottom:8px">
+        형식: <code style="background:var(--bg-light);padding:2px 6px;border-radius:4px">시간;온도;센서1;센서2;...</code> (헤더행 자동 인식)
+      </div>
+      <textarea id="multi-raw-input" placeholder="측정 시간;히터(온도);P4PD(저항);PNPD(저항);ECL(저항)&#10;2026-04-28 14:50:01;36.8;969794;893308;702157" style="width:100%;height:140px;font-size:11px;font-family:monospace;border:1.5px solid var(--border);border-radius:8px;padding:10px;resize:vertical;box-sizing:border-box;outline:none"></textarea>
+      <button onclick="multiParse()" style="width:100%;margin-top:8px;padding:9px;border-radius:8px;border:none;background:var(--primary);color:#fff;font-size:13px;font-weight:700;cursor:pointer">센서 목록 불러오기</button>
+    </div>
+
+    <div id="multi-sensor-area" style="display:none;background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px">
+      <div style="font-size:13px;font-weight:700;color:var(--text-md);margin-bottom:10px">분석할 센서 선택 <span style="font-size:11px;font-weight:400;color:var(--text-sm)">— 클릭하면 NC 센서 분석탭으로 자동 전달</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px" id="multi-sensor-buttons"></div>
+      <div style="margin-top:10px;font-size:11px;color:var(--text-sm)" id="multi-info"></div>
+    </div>
+
+    <div id="multi-preview-area" style="display:none;background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px">
+      <div style="font-size:13px;font-weight:700;color:var(--text-md);margin-bottom:8px">데이터 미리보기 <span id="multi-preview-count" style="font-weight:400;color:var(--text-sm)"></span></div>
+      <div style="overflow-x:auto"><table style="width:100%;font-size:11px;border-collapse:collapse;white-space:nowrap" id="multi-preview-table"></table></div>
+    </div>
+
+  </div>
+  </div><!-- /content-multi -->
 
 </main>
 <div id="notification"></div>
@@ -2076,7 +2113,7 @@ function highlightResultRow(resultId){
 // TAB SWITCHER
 // ══════════════════════════════════════════════
 function switchTab(tab) {
-  ['sensor','voc','solvent','polymer'].forEach(t => {
+  ['sensor','voc','solvent','polymer','multi'].forEach(t => {
     document.getElementById('content-'+t).classList.toggle('active', t===tab);
     document.getElementById('tab-'+t).classList.toggle('active', t===tab);
     const sn = document.getElementById('snav-'+t);
@@ -2085,6 +2122,7 @@ function switchTab(tab) {
   if(tab==='voc') { renderChemTable(); calcVOC(); syncVocMolVol(); renderStdGasButtons(); }
   if(tab==='solvent') renderSolventTable();
   if(tab==='polymer') renderPolymerTable();
+  if(tab==='multi') multiInitIfNeeded();
 }
 
 // ══════════════════════════════════════════════
@@ -2604,6 +2642,169 @@ function calcGasDilution(){
   document.getElementById('gd-actual-ppm').textContent = actualPpm.toFixed(2);
   document.getElementById('gd-ratio').textContent = ratio >= 1000
     ? (ratio/1000).toFixed(1)+'k' : Math.round(ratio).toLocaleString();
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// 📡 쪽보드 다중 센서 분석 모듈
+// ══════════════════════════════════════════════════════════════
+const MULTI = { headers:[], rows:[], sensorCols:[] };
+let _multiInited = false;
+
+function multiInitIfNeeded(){
+  // 아무것도 안 해도 됨 — lazy init
+}
+
+function multiParse(){
+  const raw = document.getElementById('multi-raw-input').value.trim();
+  if(!raw){ showNotification('데이터를 입력하세요','error'); return; }
+
+  const lines = raw.split('\n').map(l=>l.trim()).filter(Boolean);
+  if(!lines.length) return;
+
+  // 헤더 자동 인식: 첫 번째 줄에 숫자가 아닌 셀이 있으면 헤더
+  let headerLine = null, dataLines = lines;
+  if(lines[0].split(';').some(c => isNaN(c.trim()) && c.trim()!=='')){
+    headerLine = lines[0];
+    dataLines  = lines.slice(1);
+  }
+
+  const headers = headerLine ? headerLine.split(';').map(h=>h.trim()) : [];
+  MULTI.headers = headers;
+
+  // 데이터 파싱
+  const rows = [];
+  for(const line of dataLines){
+    const parts = line.split(';');
+    if(parts.length < 3) continue;
+    const dt = parts[0].trim();
+    const vals = parts.slice(1).map(v=>parseFloat(v.trim()));
+    rows.push({ dt, vals });
+  }
+  MULTI.rows = rows;
+
+  // 센서 컬럼 파악: 헤더 기준 (0=시간, 1=온도, 2~=센서들)
+  // 온도 컬럼은 '온도','temp','hieter','히터' 등 키워드로 판별
+  const tempKeywords = ['온도','temp','히터','heater','temperature'];
+  let tempColIdx = 1; // 기본 2번째 컬럼
+  if(headers.length > 1){
+    const found = headers.findIndex((h,i)=>i>0 && tempKeywords.some(k=>h.toLowerCase().includes(k)));
+    if(found>0) tempColIdx = found - 1; // vals 기준 인덱스
+  }
+
+  // 센서 컬럼 = 온도 제외한 나머지
+  const sensorCols = [];
+  const numCols = rows[0]?.vals.length || 0;
+  for(let i=0;i<numCols;i++){
+    if(i===tempColIdx) continue;
+    const label = headers[i+1] || `센서${i+1}`;
+    sensorCols.push({ idx:i, label, tempIdx:tempColIdx });
+  }
+  MULTI.sensorCols = sensorCols;
+  MULTI.tempColIdx = tempColIdx;
+
+  // 센서 버튼 렌더링
+  const colors = ['#3b5bdb','#0ca678','#f59f00','#e64980','#7c3aed','#1098ad','#c05621','#2b6cb0','#276749','#9b2c2c'];
+  const btnArea = document.getElementById('multi-sensor-buttons');
+  btnArea.innerHTML = sensorCols.map((sc,i)=>`
+    <button onclick="multiSelectSensor(${i})"
+      style="padding:9px 18px;border-radius:10px;border:2px solid ${colors[i%colors.length]};
+             background:#fff;color:${colors[i%colors.length]};font-size:13px;font-weight:700;
+             cursor:pointer;transition:all 0.15s"
+      id="multi-btn-${i}">
+      ${sc.label}
+    </button>`).join('');
+
+  document.getElementById('multi-info').textContent =
+    `총 ${rows.length}개 행 · ${sensorCols.length}개 센서 감지됨 · 버튼 클릭 시 NC 센서 분석탭으로 자동 전달`;
+
+  document.getElementById('multi-sensor-area').style.display = 'block';
+
+  // 미리보기 테이블
+  multiRenderPreview(headers, rows);
+
+  showNotification(`${sensorCols.length}개 센서 인식 완료!`, 'success');
+}
+
+function multiRenderPreview(headers, rows){
+  const area = document.getElementById('multi-preview-area');
+  const table = document.getElementById('multi-preview-table');
+  const count = document.getElementById('multi-preview-count');
+
+  area.style.display = 'block';
+  count.textContent = `(${rows.length}개 행, 상위 10개 표시)`;
+
+  const borderStyle = 'border:1px solid var(--border)';
+  const thStyle = `padding:6px 10px;background:var(--bg-light);text-align:left;${borderStyle};white-space:nowrap;font-size:11px`;
+  const tdStyle = `padding:5px 10px;${borderStyle};font-size:11px;color:var(--text-sm)`;
+
+  const headerHtml = headers.length
+    ? `<tr>${headers.map(h=>`<th style="${thStyle}">${h}</th>`).join('')}</tr>`
+    : '';
+
+  const bodyHtml = rows.slice(0,10).map(r=>`
+    <tr>
+      <td style="${tdStyle}">${r.dt}</td>
+      ${r.vals.map(v=>`<td style="${tdStyle}">${isNaN(v)?'─':v.toLocaleString('ko-KR',{maximumFractionDigits:2})}</td>`).join('')}
+    </tr>`).join('');
+
+  table.innerHTML = `<thead>${headerHtml}</thead><tbody>${bodyHtml}</tbody>`;
+}
+
+function multiSelectSensor(sensorIdx){
+  const sc = MULTI.sensorCols[sensorIdx];
+  if(!sc){ showNotification('센서 정보 없음','error'); return; }
+
+  // 버튼 활성화
+  MULTI.sensorCols.forEach((_,i)=>{
+    const btn = document.getElementById('multi-btn-'+i);
+    if(!btn) return;
+    const colors = ['#3b5bdb','#0ca678','#f59f00','#e64980','#7c3aed','#1098ad','#c05621','#2b6cb0','#276749','#9b2c2c'];
+    const c = colors[i%colors.length];
+    btn.style.background = i===sensorIdx ? c : '#fff';
+    btn.style.color = i===sensorIdx ? '#fff' : c;
+  });
+
+  // raw-input 형식으로 변환: "시간;온도;습도(0);저항" → parseData 4컬럼 형식
+  // 습도는 없으므로 0 입력 (env 섹션에서 수동 입력 유도)
+  const tempIdx = MULTI.tempColIdx;
+  const lines = MULTI.rows.map(r=>{
+    const temp = r.vals[tempIdx] ?? '';
+    const res  = r.vals[sc.idx] ?? '';
+    return `${r.dt};${temp};0;${res}`;
+  });
+
+  // 센서 이름에서 고분자 추출해서 material-select 자동 설정
+  const label = sc.label;
+  const polymerMatch = label.match(/^([A-Z0-9]+)/);
+  if(polymerMatch){
+    const matSel = document.getElementById('material-select');
+    if(matSel){
+      const opt = Array.from(matSel.options).find(o=>o.value===polymerMatch[1]);
+      if(opt) matSel.value = polymerMatch[1];
+    }
+  }
+
+  // sensor-name 자동 설정
+  const nameEl = document.getElementById('sensor-name');
+  if(nameEl) nameEl.value = label;
+
+  // raw-input에 넣고 플롯
+  document.getElementById('raw-input').value = lines.join('\n');
+
+  // NC 센서 분석 탭으로 전환 후 플롯
+  switchTab('sensor');
+  // 탭 전환 + Plotly 컨테이너 렌더링 대기 후 플롯
+  const _tryPlot = (attempt) => {
+    const chartEl = document.getElementById('plotly-chart');
+    if(!chartEl || chartEl.offsetWidth === 0){
+      if(attempt < 20) setTimeout(()=>_tryPlot(attempt+1), 100);
+      return;
+    }
+    parseAndPlot();
+    showNotification(`📡 ${label} → NC 센서 분석탭 전달 완료`, 'success');
+  };
+  setTimeout(()=>_tryPlot(0), 100);
 }
 
 </script>
