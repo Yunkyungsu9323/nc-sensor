@@ -2785,9 +2785,10 @@ function multiSelectSensor(sensorIdx){
     }
   }
 
-  // sensor-name 자동 설정
+  // sensor-name 자동 설정: "PNPD(저항)" → "PNPD(쪽보드)"
+  const cleanLabel = label.replace(/\(.*?\)/, '(쪽보드)');
   const nameEl = document.getElementById('sensor-name');
-  if(nameEl) nameEl.value = label;
+  if(nameEl) nameEl.value = cleanLabel;
 
   // raw-input에 넣고 플롯
   document.getElementById('raw-input').value = lines.join('\n');
