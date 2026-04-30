@@ -638,6 +638,53 @@ tbody td { padding: 7px 10px; color: var(--text); white-space: nowrap; font-size
       <button class="btn btn-primary" onclick="parseAndPlot()" style="width:100%">📈 PLOT 그래프 그리기</button>
     </div>
 
+    <!-- DB Auto Load -->
+    <div class="ctrl-card" style="flex-direction:column;gap:8px;min-width:260px;max-width:340px">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:12px;font-weight:700;color:var(--text-md);">🗄️ DB 자동 로드</span>
+        <span id="db-status-dot" style="width:8px;height:8px;border-radius:50%;background:#cbd5e1;flex-shrink:0;margin-left:auto"></span>
+        <span id="db-status-text" style="font-size:10px;color:var(--text-sm)">대기중</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+        <div>
+          <label style="font-size:10px;color:var(--text-sm);font-weight:600;display:block;margin-bottom:2px">Sensor ID</label>
+          <input type="number" id="db-sensor-id" value="34" min="1" style="width:100%;padding:5px 8px;border:1px solid var(--border-md);border-radius:6px;font-size:12px;font-family:inherit;outline:none" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border-md)'">
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--text-sm);font-weight:600;display:block;margin-bottom:2px">Temp Sensor ID</label>
+          <input type="number" id="db-temp-sensor-id" value="15" min="1" style="width:100%;padding:5px 8px;border:1px solid var(--border-md);border-radius:6px;font-size:12px;font-family:inherit;outline:none" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border-md)'">
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--text-sm);font-weight:600;display:block;margin-bottom:2px">기간 (시간)</label>
+          <select id="db-hours" style="width:100%;padding:5px 8px;border:1px solid var(--border-md);border-radius:6px;font-size:12px;font-family:inherit;outline:none">
+            <option value="0.5">30분</option>
+            <option value="1" selected>1시간</option>
+            <option value="3">3시간</option>
+            <option value="6">6시간</option>
+            <option value="12">12시간</option>
+            <option value="24">24시간</option>
+            <option value="48">48시간</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--text-sm);font-weight:600;display:block;margin-bottom:2px">자동갱신</label>
+          <select id="db-refresh-interval" style="width:100%;padding:5px 8px;border:1px solid var(--border-md);border-radius:6px;font-size:12px;font-family:inherit;outline:none" onchange="dbSetRefresh()">
+            <option value="0">OFF</option>
+            <option value="30">30초</option>
+            <option value="60">1분</option>
+            <option value="300">5분</option>
+            <option value="600">10분</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:10px;color:var(--text-sm);font-weight:600;display:block;margin-bottom:2px">API 서버 주소</label>
+        <input type="text" id="db-api-url" value="http://localhost:8000" style="width:100%;padding:5px 8px;border:1px solid var(--border-md);border-radius:6px;font-size:12px;font-family:inherit;outline:none" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border-md)'">
+      </div>
+      <button class="btn btn-primary" onclick="dbLoad()" style="width:100%">🗄️ DB에서 불러오기</button>
+      <div id="db-last-loaded" style="font-size:10px;color:var(--text-sm);text-align:center"></div>
+    </div>
+
     <!-- Mode selection -->
     <div class="ctrl-card" style="flex-direction:column;gap:8px;min-width:260px;max-width:340px">
       <span style="font-size:12px;font-weight:700;color:var(--text-md);">🎯 분석 모드 선택</span>
@@ -2379,6 +2426,55 @@ function showPolymerDetail(name) {
 
 // Init VOC tab on first load
 renderChemTable();
+
+// ══════════════════════════════════════════════════════════════
+// DB 자동 로드
+// ══════════════════════════════════════════════════════════════
+let _dbRefreshTimer = null;
+
+async function dbLoad() {
+  const apiUrl = (document.getElementById('db-api-url').value || 'http://localhost:8000').trim().replace(/\/$/, '');
+  const sensorId = parseInt(document.getElementById('db-sensor-id').value) || 34;
+  const tempSensorId = parseInt(document.getElementById('db-temp-sensor-id').value) || 15;
+  const hours = parseFloat(document.getElementById('db-hours').value) || 1;
+
+  const dot = document.getElementById('db-status-dot');
+  const txt = document.getElementById('db-status-text');
+  dot.style.background = '#f59f00';
+  txt.textContent = '로딩 중...';
+
+  try {
+    const url = `${apiUrl}/ncs/data?sensor_id=${sensorId}&temp_sensor_id=${tempSensorId}&hours=${hours}`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    if (!data.tsv || data.count === 0) { throw new Error('해당 기간 데이터 없음'); }
+
+    document.getElementById('raw-input').value = data.tsv;
+    parseAndPlot();
+
+    dot.style.background = '#12b886';
+    txt.textContent = `완료 (${data.count}건)`;
+    const now = new Date().toLocaleTimeString('ko-KR');
+    document.getElementById('db-last-loaded').textContent = `마지막 갱신: ${now}`;
+    showNotification(`DB 로드 완료 — ${data.count}건`, 'success');
+  } catch(e) {
+    dot.style.background = '#fa5252';
+    txt.textContent = '연결 실패';
+    document.getElementById('db-last-loaded').textContent = `오류: ${e.message}`;
+    showNotification(`DB 로드 실패: ${e.message}`, 'error');
+  }
+}
+
+function dbSetRefresh() {
+  if (_dbRefreshTimer) { clearInterval(_dbRefreshTimer); _dbRefreshTimer = null; }
+  const sec = parseInt(document.getElementById('db-refresh-interval').value) || 0;
+  if (sec > 0) {
+    dbLoad();
+    _dbRefreshTimer = setInterval(dbLoad, sec * 1000);
+  }
+}
 
 // ══════════════════════════════════════════════════════════════
 </script>
