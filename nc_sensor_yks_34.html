@@ -657,12 +657,13 @@ tbody td { padding: 7px 10px; color: var(--text); white-space: nowrap; font-size
     </div>
 
     <!-- DB Auto Load -->
-    <div class="ctrl-card" style="flex-direction:column;gap:8px;min-width:260px;max-width:340px">
+    <div class="ctrl-card" style="flex-direction:column;gap:8px;min-width:260px;max-width:360px">
       <div style="display:flex;align-items:center;gap:8px;">
         <span style="font-size:12px;font-weight:700;color:var(--text-md);">🗄️ DB 자동 로드</span>
         <span id="db-status-dot" style="width:8px;height:8px;border-radius:50%;background:#cbd5e1;flex-shrink:0;margin-left:auto"></span>
         <span id="db-status-text" style="font-size:10px;color:var(--text-sm)">대기중</span>
       </div>
+      <!-- Sensor IDs -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
         <div>
           <label style="font-size:10px;color:var(--text-sm);font-weight:600;display:block;margin-bottom:2px">Sensor ID</label>
@@ -672,6 +673,14 @@ tbody td { padding: 7px 10px; color: var(--text); white-space: nowrap; font-size
           <label style="font-size:10px;color:var(--text-sm);font-weight:600;display:block;margin-bottom:2px">Temp Sensor ID</label>
           <input type="number" id="db-temp-sensor-id" value="15" min="1" style="width:100%;padding:5px 8px;border:1px solid var(--border-md);border-radius:6px;font-size:12px;font-family:inherit;outline:none" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border-md)'">
         </div>
+      </div>
+      <!-- Mode toggle -->
+      <div style="display:flex;gap:0;border:1px solid var(--border-md);border-radius:6px;overflow:hidden;font-size:11px;">
+        <button id="db-mode-recent" onclick="dbSwitchMode('recent')" style="flex:1;padding:5px;border:none;background:var(--primary);color:#fff;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer;">최근 N시간</button>
+        <button id="db-mode-range" onclick="dbSwitchMode('range')" style="flex:1;padding:5px;border:none;background:var(--bg);color:var(--text-md);font-family:inherit;font-size:11px;font-weight:600;cursor:pointer;">직접 설정</button>
+      </div>
+      <!-- 최근 N시간 패널 -->
+      <div id="db-panel-recent" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
         <div>
           <label style="font-size:10px;color:var(--text-sm);font-weight:600;display:block;margin-bottom:2px">기간 (시간)</label>
           <select id="db-hours" style="width:100%;padding:5px 8px;border:1px solid var(--border-md);border-radius:6px;font-size:12px;font-family:inherit;outline:none">
@@ -695,6 +704,21 @@ tbody td { padding: 7px 10px; color: var(--text); white-space: nowrap; font-size
           </select>
         </div>
       </div>
+      <!-- 직접 설정 패널 -->
+      <div id="db-panel-range" style="display:none;flex-direction:column;gap:6px;">
+        <div>
+          <label style="font-size:10px;color:var(--text-sm);font-weight:600;display:block;margin-bottom:2px">시작 시간</label>
+          <input type="datetime-local" id="db-start" style="width:100%;padding:5px 8px;border:1px solid var(--border-md);border-radius:6px;font-size:12px;font-family:inherit;outline:none" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border-md)'">
+        </div>
+        <div style="display:flex;gap:6px;align-items:flex-end;">
+          <div style="flex:1">
+            <label style="font-size:10px;color:var(--text-sm);font-weight:600;display:block;margin-bottom:2px">종료 시간</label>
+            <input type="datetime-local" id="db-end" style="width:100%;padding:5px 8px;border:1px solid var(--border-md);border-radius:6px;font-size:12px;font-family:inherit;outline:none" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border-md)'">
+          </div>
+          <button onclick="dbSetNow()" style="padding:5px 8px;border:1px solid var(--border-md);border-radius:6px;background:var(--bg);font-size:11px;font-family:inherit;cursor:pointer;white-space:nowrap;height:30px;">지금</button>
+        </div>
+      </div>
+      <!-- API URL -->
       <div>
         <label style="font-size:10px;color:var(--text-sm);font-weight:600;display:block;margin-bottom:2px">API 서버 주소</label>
         <input type="text" id="db-api-url" value="http://localhost:8000" style="width:100%;padding:5px 8px;border:1px solid var(--border-md);border-radius:6px;font-size:12px;font-family:inherit;outline:none" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border-md)'">
@@ -2859,20 +2883,55 @@ function multiSelectSensor(sensorIdx){
 // DB 자동 로드
 // ══════════════════════════════════════════════════════════════
 let _dbRefreshTimer = null;
+let _dbMode = 'recent';
+
+function dbSwitchMode(mode) {
+  _dbMode = mode;
+  document.getElementById('db-panel-recent').style.display = mode === 'recent' ? 'grid' : 'none';
+  document.getElementById('db-panel-range').style.display  = mode === 'range'  ? 'flex' : 'none';
+  document.getElementById('db-mode-recent').style.background = mode === 'recent' ? 'var(--primary)' : 'var(--bg)';
+  document.getElementById('db-mode-recent').style.color      = mode === 'recent' ? '#fff' : 'var(--text-md)';
+  document.getElementById('db-mode-range').style.background  = mode === 'range'  ? 'var(--primary)' : 'var(--bg)';
+  document.getElementById('db-mode-range').style.color       = mode === 'range'  ? '#fff' : 'var(--text-md)';
+  if (mode === 'recent' && _dbRefreshTimer) { /* keep timer */ }
+  if (mode === 'range') { dbSetRefresh(); } // 직접설정 모드는 자동갱신 중단
+}
+
+function dbSetNow() {
+  const now = new Date();
+  now.setSeconds(0, 0);
+  document.getElementById('db-end').value = now.toISOString().slice(0, 16);
+}
 
 async function dbLoad() {
   const apiUrl = (document.getElementById('db-api-url').value || 'http://localhost:8000').trim().replace(/\/$/, '');
   const sensorId = parseInt(document.getElementById('db-sensor-id').value) || 34;
   const tempSensorId = parseInt(document.getElementById('db-temp-sensor-id').value) || 15;
-  const hours = parseFloat(document.getElementById('db-hours').value) || 1;
 
   const dot = document.getElementById('db-status-dot');
   const txt = document.getElementById('db-status-text');
   dot.style.background = '#f59f00';
   txt.textContent = '로딩 중...';
 
+  let url;
+  if (_dbMode === 'range') {
+    const startVal = document.getElementById('db-start').value;
+    const endVal   = document.getElementById('db-end').value;
+    if (!startVal || !endVal) {
+      dot.style.background = '#fa5252';
+      txt.textContent = '시간 미입력';
+      document.getElementById('db-last-loaded').textContent = '시작/종료 시간을 입력해 주세요.';
+      return;
+    }
+    const start = startVal.replace('T', ' ') + ':00';
+    const end   = endVal.replace('T', ' ')   + ':00';
+    url = `${apiUrl}/ncs/data?sensor_id=${sensorId}&temp_sensor_id=${tempSensorId}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+  } else {
+    const hours = parseFloat(document.getElementById('db-hours').value) || 1;
+    url = `${apiUrl}/ncs/data?sensor_id=${sensorId}&temp_sensor_id=${tempSensorId}&hours=${hours}`;
+  }
+
   try {
-    const url = `${apiUrl}/ncs/data?sensor_id=${sensorId}&temp_sensor_id=${tempSensorId}&hours=${hours}`;
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
