@@ -2774,7 +2774,10 @@ function multiParse(){
   const numCols = rows[0]?.vals.length || 0;
   for(let i=0;i<numCols;i++){
     if(i===tempColIdx) continue;
-    const label = headers[i+1] || `센서${i+1}`;
+    let label = headers[i+1] || `센서${i+1}`;
+    if(/^센서\d+\(저항\)$/i.test(label.trim())) continue; // 이름 없는 센서 제외
+    label = label.replace(/^\.*/, '').trim();              // 앞의 . 제거
+    label = label.replace(/\(저항\)/g, '(쪽보드)');        // (저항) → (쪽보드)
     sensorCols.push({ idx:i, label, tempIdx:tempColIdx });
   }
   MULTI.sensorCols = sensorCols;
