@@ -2302,8 +2302,9 @@ function calcVOC() {
   const labelSuffix = c._extra ? ' (암모니아수 용액)' : '';
   document.getElementById('voc-result-label').textContent = `필요한 ${c.name} 주입량${labelSuffix}`;
   document.getElementById('voc-result-val').textContent = reqUl.toFixed(2);
+  const mwLabel = (c._extra && c._extra.mwGas) ? 'NH₃' : c.name;
   document.getElementById('voc-formula-display').textContent =
-    `(${targetPpm}ppm × ${mwEff}g/mol [NH₃] × ${airVol}L) ÷ (${Vm.toFixed(3)} × ${c.density} × ${(c.purity/100).toFixed(3)} × 1000)`;
+    `(${targetPpm}ppm × ${mwEff}g/mol [${mwLabel}] × ${airVol}L) ÷ (${Vm.toFixed(3)} × ${c.density} × ${(c.purity/100).toFixed(3)} × 1000)`;
 
   // 도구 추천
   const toolBox = document.getElementById('voc-tool-box');
