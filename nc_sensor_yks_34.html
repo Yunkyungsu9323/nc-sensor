@@ -1182,7 +1182,7 @@ tbody td { padding: 7px 10px; color: var(--text); white-space: nowrap; font-size
       <span style="font-size:14px;font-weight:700;color:var(--text)">NC 센서 저항값</span>
       <span id="mon-ncs-range" style="font-size:11px;color:var(--text-sm);margin-left:auto"></span>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px">
       <div id="mon-ncs-card-1" style="background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,0.05);overflow:hidden"></div>
       <div id="mon-ncs-card-2" style="background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,0.05);overflow:hidden"></div>
       <div id="mon-ncs-card-3" style="background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,0.05);overflow:hidden"></div>
@@ -1195,13 +1195,13 @@ tbody td { padding: 7px 10px; color: var(--text); white-space: nowrap; font-size
       <span style="font-size:14px;font-weight:700;color:var(--text)">쪽보드 고분자 저항값</span>
       <span id="mon-ceramic-range" style="font-size:11px;color:var(--text-sm);margin-left:auto"></span>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px">
       <div id="mon-cer-card-3" style="background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,0.05);overflow:hidden"></div>
       <div id="mon-cer-card-4" style="background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,0.05);overflow:hidden"></div>
       <div id="mon-cer-card-5" style="background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,0.05);overflow:hidden"></div>
-      <div id="mon-cer-card-6" style="background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,0.05);overflow:hidden"></div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px">
+      <div id="mon-cer-card-6" style="background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,0.05);overflow:hidden"></div>
       <div id="mon-cer-card-7" style="background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,0.05);overflow:hidden"></div>
       <div id="mon-cer-card-8" style="background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,0.05);overflow:hidden"></div>
       <div id="mon-cer-card-9" style="background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,0.05);overflow:hidden"></div>
@@ -3204,7 +3204,7 @@ function monRenderCard(cardId, name, color, xs, ys, lastVal, lastTime) {
       <span style="font-size:15px;font-weight:800;color:${color};margin-left:auto">${valStr}</span>
       <span style="font-size:10px;color:var(--text-sm)">${lastTime}</span>
     </div>
-    <div id="${cardId}-plot" style="height:190px"></div>`;
+    <div id="${cardId}-plot" style="height:280px"></div>`;
   Plotly.react(`${cardId}-plot`,
     [{ x:xs, y:scaledYs, type:'scatter', mode:'lines', line:{color, width:2},
        hovertemplate:`%{x}<br>${name}: %{y:.3f} ${unit}<extra></extra>` }],
