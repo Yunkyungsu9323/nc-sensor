@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NC Sensor · 실시간 모니터</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.27.0/plotly.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #f0f4ff;
+  --card:     #ffffff;
+  --border:   #e2e8f0;
+  --primary:  #3b5bdb;
+  --green:    #12b886;
+  --red:      #fa5252;
+  --amber:    #f59f00;
+  --text:     #1e293b;
+  --text-md:  #475569;
+  --text-sm:  #94a3b8;
+  --radius:   12px;
+  --shadow:   0 4px 20px rgba(0,0,0,0.07);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', 'Noto Sans KR', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 13px;
+}
+
+/* ── 헤더 ── */
+.topbar {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.topbar-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+.topbar-title small {
+  font-size: 10px;
+  color: var(--text-sm);
+  font-weight: 400;
+}
+.topbar-sep { width: 1px; height: 24px; background: var(--border); }
+.ctrl-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-sm);
+  margin-bottom: 2px;
+}
+.ctrl-group { display: flex; flex-direction: column; gap: 2px; }
+select, input[type="text"], input[type="number"] {
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--text);
+  outline: none;
+  background: #fff;
+  height: 30px;
+}
+select:focus, input:focus { border-color: var(--primary); }
+
+.btn {
+  padding: 6px 14px;
+  border-radius: 7px;
+  border: none;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: #2f4ac4; }
+.btn-stop { background: var(--red); color: #fff; }
+.btn-stop:hover { background: #e03131; }
+.btn-outline { background: #fff; color: var(--primary); border: 1.5px solid var(--primary); }
+
+/* 상태 표시 */
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #f1f3f5;
+  color: var(--text-md);
+  white-space: nowrap;
+}
+.status-pill.ok    { background: #e6fcf5; color: #099268; }
+.status-pill.err   { background: #fff5f5; color: #c92a2a; }
+.status-pill.loading { background: #fff9db; color: #e67700; }
+.status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #adb5bd;
+  flex-shrink: 0;
+}
+.status-pill.ok    .status-dot { background: var(--green); }
+.status-pill.err   .status-dot { background: var(--red); }
+.status-pill.loading .status-dot { background: var(--amber); animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* ── 메인 ── */
+.main { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+
+/* ── 차트 카드 ── */
+.chart-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.chart-header {
+  padding: 14px 18px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.chart-header h2 { font-size: 14px; font-weight: 700; color: var(--text); }
+.chart-header .sub { font-size: 11px; color: var(--text-sm); margin-left: auto; }
+.chart-body { padding: 8px 4px 4px; }
+
+/* ── 최근값 배지 ── */
+.latest-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 18px;
+  border-top: 1px solid var(--border);
+}
+.latest-badge {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 12px;
+  min-width: 100px;
+}
+.latest-badge .lb-name { font-size: 10px; color: var(--text-sm); font-weight: 600; }
+.latest-badge .lb-val  { font-size: 15px; font-weight: 700; }
+.latest-badge .lb-time { font-size: 10px; color: var(--text-sm); }
+
+/* ── 갱신 카운트다운 ── */
+.countdown { font-size: 11px; color: var(--text-sm); margin-left: auto; }
+</style>
+</head>
+<body>
+
+<!-- 헤더 -->
+<div class="topbar">
+  <div class="topbar-title">
+    📡 실시간 센서 모니터
+    <small>TSEI Semiconductor Analysis Lab</small>
+  </div>
+  <div class="topbar-sep"></div>
+
+  <div class="ctrl-group">
+    <div class="ctrl-label">API 서버</div>
+    <input type="text" id="api-url" value="http://localhost:8000" style="width:190px">
+  </div>
+
+  <div class="ctrl-group">
+    <div class="ctrl-label">표시 기간</div>
+    <select id="hours-sel">
+      <option value="0.5">30분</option>
+      <option value="1" selected>1시간</option>
+      <option value="3">3시간</option>
+      <option value="6">6시간</option>
+      <option value="12">12시간</option>
+      <option value="24">24시간</option>
+    </select>
+  </div>
+
+  <div class="ctrl-group">
+    <div class="ctrl-label">자동갱신</div>
+    <select id="refresh-sel">
+      <option value="0">OFF</option>
+      <option value="30">30초</option>
+      <option value="60" selected>1분</option>
+      <option value="300">5분</option>
+    </select>
+  </div>
+
+  <button class="btn btn-primary" id="btn-load" onclick="loadAll()">🔄 지금 불러오기</button>
+  <button class="btn btn-stop" id="btn-stop" onclick="stopRefresh()" style="display:none">⏹ 자동갱신 중지</button>
+
+  <div id="status-pill" class="status-pill">
+    <span class="status-dot"></span>
+    <span id="status-text">대기중</span>
+  </div>
+
+  <span class="countdown" id="countdown-text"></span>
+</div>
+
+<!-- 메인 -->
+<div class="main">
+
+  <!-- NC 센서 차트 -->
+  <div class="chart-card">
+    <div class="chart-header">
+      <span style="font-size:18px">🧪</span>
+      <h2>NC 센서 저항값 — Sensor ID 1 · 2 · 3 · 4</h2>
+      <span class="sub" id="ncs-range-text"></span>
+    </div>
+    <div class="chart-body">
+      <div id="chart-ncs" style="height:360px"></div>
+    </div>
+    <div class="latest-row" id="ncs-latest-row"></div>
+  </div>
+
+  <!-- 쪽보드 차트 -->
+  <div class="chart-card">
+    <div class="chart-header">
+      <span style="font-size:18px">🔬</span>
+      <h2>쪽보드 고분자 저항값 — P4PD · PNPD · EPDM · PS · ECL · PMMA · PEO</h2>
+      <span class="sub" id="ceramic-range-text"></span>
+    </div>
+    <div class="chart-body">
+      <div id="chart-ceramic" style="height:360px"></div>
+    </div>
+    <div class="latest-row" id="ceramic-latest-row"></div>
+  </div>
+
+</div>
+
+<script>
+const NCS_SENSORS = [
+  { id: 1, name: 'Sensor 1', color: '#3b5bdb' },
+  { id: 2, name: 'Sensor 2', color: '#0ca678' },
+  { id: 3, name: 'Sensor 3', color: '#f59f00' },
+  { id: 4, name: 'Sensor 4', color: '#e64980' },
+];
+const TEMP_SENSOR_ID = 15;
+
+const CERAMIC_SENSORS = {
+  3: { name: 'P4PD',  color: '#3b5bdb' },
+  4: { name: 'PNPD',  color: '#0ca678' },
+  5: { name: 'EPDM',  color: '#f59f00' },
+  6: { name: 'PS',    color: '#e64980' },
+  7: { name: 'ECL',   color: '#7c3aed' },
+  8: { name: 'PMMA',  color: '#1098ad' },
+  9: { name: 'PEO',   color: '#c05621' },
+};
+
+let _timer = null;
+let _countdown = 0;
+let _countdownTimer = null;
+
+function api() {
+  return (document.getElementById('api-url').value || 'http://localhost:8000').trim().replace(/\/$/, '');
+}
+function hours() {
+  return parseFloat(document.getElementById('hours-sel').value) || 1;
+}
+
+function setStatus(state, text) {
+  const pill = document.getElementById('status-pill');
+  const span = document.getElementById('status-text');
+  pill.className = 'status-pill ' + state;
+  span.textContent = text;
+}
+
+/* ── NC 센서 로드 ── */
+async function loadNCS() {
+  const h = hours();
+  const BASE = api();
+  const sParams = NCS_SENSORS.map(s =>
+    fetch(`${BASE}/ncs/data?sensor_id=${s.id}&temp_sensor_id=${TEMP_SENSOR_ID}&hours=${h}`)
+      .then(r => r.json())
+      .catch(() => null)
+  );
+  const results = await Promise.all(sParams);
+
+  const traces = [];
+  const latestData = [];
+
+  results.forEach((data, i) => {
+    const sensor = NCS_SENSORS[i];
+    if (!data || !data.rows || data.rows.length === 0) {
+      latestData.push({ name: sensor.name, val: null, time: null, color: sensor.color });
+      return;
+    }
+    const xs = data.rows.map(r => r['측정 시간']);
+    const ys = data.rows.map(r => r['저항']);
+    traces.push({
+      x: xs, y: ys,
+      name: sensor.name,
+      type: 'scatter', mode: 'lines',
+      line: { color: sensor.color, width: 2 },
+      hovertemplate: `<b>${sensor.name}</b><br>%{x}<br>저항: %{y:.0f} Ω<extra></extra>`
+    });
+    const last = data.rows[data.rows.length - 1];
+    latestData.push({
+      name: sensor.name,
+      val: last['저항'],
+      time: String(last['측정 시간']).slice(11, 19),
+      color: sensor.color
+    });
+    if (i === 0 && data.start) {
+      document.getElementById('ncs-range-text').textContent =
+        `${data.start.slice(5, 16)} ~ ${data.end.slice(5, 16)}`;
+    }
+  });
+
+  const layout = {
+    margin: { t: 10, b: 50, l: 70, r: 20 },
+    xaxis: { title: '시간', showgrid: true, gridcolor: '#f1f3f5' },
+    yaxis: { title: '저항 (Ω)', showgrid: true, gridcolor: '#f1f3f5' },
+    legend: { orientation: 'h', y: -0.18 },
+    hovermode: 'x unified',
+    plot_bgcolor: '#fff',
+    paper_bgcolor: '#fff',
+    font: { family: 'Inter, Noto Sans KR, sans-serif', size: 11 }
+  };
+  Plotly.react('chart-ncs', traces, layout, { responsive: true, displaylogo: false });
+
+  // 최근값 배지
+  const row = document.getElementById('ncs-latest-row');
+  row.innerHTML = latestData.map(d => `
+    <div class="latest-badge">
+      <span class="lb-name" style="color:${d.color}">${d.name}</span>
+      <span class="lb-val" style="color:${d.color}">${d.val != null ? Number(d.val).toLocaleString() + ' Ω' : '─'}</span>
+      <span class="lb-time">${d.time || ''}</span>
+    </div>`).join('');
+}
+
+/* ── 쪽보드 로드 ── */
+async function loadCeramic() {
+  const h = hours();
+  const BASE = api();
+  const sParams = Object.entries(CERAMIC_SENSORS)
+    .map(([sid, s]) => `s${sid}=${encodeURIComponent(s.name)}`).join('&');
+  const url = `${BASE}/ceramic/data?board_id=1&hours=${h}&${sParams}`;
+
+  let data;
+  try {
+    const r = await fetch(url);
+    data = await r.json();
+  } catch(e) {
+    return;
+  }
+
+  if (!data || !data.rows || data.rows.length === 0) return;
+
+  const headers = Object.keys(data.rows[0]);
+  const timeCol = headers[0];
+
+  const traces = [];
+  const latestData = [];
+
+  Object.entries(CERAMIC_SENSORS).forEach(([sid, sensor]) => {
+    const col = `${sensor.name}(저항)`;
+    if (!headers.includes(col)) return;
+    const xs = data.rows.map(r => r[timeCol]);
+    const ys = data.rows.map(r => r[col]);
+    traces.push({
+      x: xs, y: ys,
+      name: sensor.name,
+      type: 'scatter', mode: 'lines',
+      line: { color: sensor.color, width: 2 },
+      hovertemplate: `<b>${sensor.name}</b><br>%{x}<br>저항: %{y:.0f} Ω<extra></extra>`
+    });
+    const last = data.rows[data.rows.length - 1];
+    latestData.push({
+      name: sensor.name,
+      val: last[col],
+      time: String(last[timeCol]).slice(11, 19),
+      color: sensor.color
+    });
+  });
+
+  if (data.start) {
+    document.getElementById('ceramic-range-text').textContent =
+      `${data.start.slice(5, 16)} ~ ${data.end.slice(5, 16)}`;
+  }
+
+  const layout = {
+    margin: { t: 10, b: 50, l: 70, r: 20 },
+    xaxis: { title: '시간', showgrid: true, gridcolor: '#f1f3f5' },
+    yaxis: { title: '저항 (Ω)', showgrid: true, gridcolor: '#f1f3f5' },
+    legend: { orientation: 'h', y: -0.18 },
+    hovermode: 'x unified',
+    plot_bgcolor: '#fff',
+    paper_bgcolor: '#fff',
+    font: { family: 'Inter, Noto Sans KR, sans-serif', size: 11 }
+  };
+  Plotly.react('chart-ceramic', traces, layout, { responsive: true, displaylogo: false });
+
+  const row = document.getElementById('ceramic-latest-row');
+  row.innerHTML = latestData.map(d => `
+    <div class="latest-badge">
+      <span class="lb-name" style="color:${d.color}">${d.name}</span>
+      <span class="lb-val" style="color:${d.color}">${d.val != null ? Number(d.val).toLocaleString() + ' Ω' : '─'}</span>
+      <span class="lb-time">${d.time || ''}</span>
+    </div>`).join('');
+}
+
+/* ── 전체 로드 ── */
+async function loadAll() {
+  setStatus('loading', '불러오는 중...');
+  try {
+    await Promise.all([loadNCS(), loadCeramic()]);
+    const now = new Date().toLocaleTimeString('ko-KR');
+    setStatus('ok', `갱신 완료 ${now}`);
+  } catch(e) {
+    setStatus('err', '오류 발생');
+  }
+  startCountdown();
+}
+
+/* ── 자동갱신 ── */
+function startRefresh() {
+  if (_timer) { clearInterval(_timer); _timer = null; }
+  const sec = parseInt(document.getElementById('refresh-sel').value) || 0;
+  if (sec <= 0) {
+    document.getElementById('btn-stop').style.display = 'none';
+    document.getElementById('countdown-text').textContent = '';
+    return;
+  }
+  document.getElementById('btn-stop').style.display = 'flex';
+  _timer = setInterval(loadAll, sec * 1000);
+}
+
+function stopRefresh() {
+  if (_timer) { clearInterval(_timer); _timer = null; }
+  if (_countdownTimer) { clearInterval(_countdownTimer); _countdownTimer = null; }
+  document.getElementById('btn-stop').style.display = 'none';
+  document.getElementById('countdown-text').textContent = '';
+}
+
+function startCountdown() {
+  if (_countdownTimer) clearInterval(_countdownTimer);
+  const sec = parseInt(document.getElementById('refresh-sel').value) || 0;
+  if (sec <= 0) { document.getElementById('countdown-text').textContent = ''; return; }
+  _countdown = sec;
+  const el = document.getElementById('countdown-text');
+  el.textContent = `다음 갱신: ${_countdown}초`;
+  _countdownTimer = setInterval(() => {
+    _countdown--;
+    if (_countdown <= 0) {
+      clearInterval(_countdownTimer);
+      el.textContent = '갱신 중...';
+    } else {
+      el.textContent = `다음 갱신: ${_countdown}초`;
+    }
+  }, 1000);
+}
+
+document.getElementById('refresh-sel').addEventListener('change', () => {
+  stopRefresh();
+  loadAll().then(startRefresh);
+});
+document.getElementById('hours-sel').addEventListener('change', loadAll);
+
+// 최초 로드
+loadAll().then(startRefresh);
+</script>
+</body>
+</html>
