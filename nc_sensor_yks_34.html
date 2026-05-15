@@ -1142,19 +1142,24 @@ tbody td { padding: 7px 10px; color: var(--text); white-space: nowrap; font-size
       <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <div>
           <div style="font-size:10px;color:var(--text-sm);font-weight:600;margin-bottom:2px">표시 기간</div>
-          <select id="mon-hours" style="padding:5px 9px;border:1px solid var(--border-md);border-radius:7px;font-family:inherit;font-size:12px;outline:none" onchange="monLoad()">
+          <select id="mon-hours" style="padding:5px 9px;border:1px solid var(--border-md);border-radius:7px;font-family:inherit;font-size:12px;outline:none" onchange="monHoursChange()">
             <option value="0.5">30분</option>
             <option value="1" selected>1시간</option>
             <option value="3">3시간</option>
             <option value="6">6시간</option>
             <option value="12">12시간</option>
             <option value="24">24시간</option>
+            <option value="custom">직접 입력</option>
           </select>
+          <input type="number" id="mon-hours-custom" min="0.1" step="0.5" placeholder="시간"
+            style="display:none;width:80px;padding:5px 8px;border:1px solid var(--border-md);border-radius:7px;font-family:inherit;font-size:12px;outline:none;margin-top:4px"
+            onchange="monLoad()">
         </div>
         <div>
           <div style="font-size:10px;color:var(--text-sm);font-weight:600;margin-bottom:2px">자동갱신</div>
           <select id="mon-refresh" style="padding:5px 9px;border:1px solid var(--border-md);border-radius:7px;font-family:inherit;font-size:12px;outline:none" onchange="monSetRefresh()">
             <option value="0">OFF</option>
+            <option value="5">5초</option>
             <option value="30">30초</option>
             <option value="60" selected>1분</option>
             <option value="300">5분</option>
@@ -3128,7 +3133,16 @@ function monInitIfNeeded() {
   if (!_monInited) { _monInited = true; monLoad(); monSetRefresh(); }
 }
 
-function monHours() { return parseFloat(document.getElementById('mon-hours').value) || 1; }
+function monHours() {
+  const sel = document.getElementById('mon-hours').value;
+  if (sel === 'custom') return parseFloat(document.getElementById('mon-hours-custom').value) || 1;
+  return parseFloat(sel) || 1;
+}
+function monHoursChange() {
+  const isCustom = document.getElementById('mon-hours').value === 'custom';
+  document.getElementById('mon-hours-custom').style.display = isCustom ? 'block' : 'none';
+  if (!isCustom) monLoad();
+}
 
 function monSetStatus(msg, color) {
   const el = document.getElementById('mon-status');
