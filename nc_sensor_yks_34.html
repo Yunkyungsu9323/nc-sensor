@@ -1151,9 +1151,15 @@ tbody td { padding: 7px 10px; color: var(--text); white-space: nowrap; font-size
             <option value="24">24시간</option>
             <option value="custom">직접 입력</option>
           </select>
-          <input type="number" id="mon-hours-custom" min="0.1" step="0.5" placeholder="시간"
-            style="display:none;width:80px;padding:5px 8px;border:1px solid var(--border-md);border-radius:7px;font-family:inherit;font-size:12px;outline:none;margin-top:4px"
-            onchange="monLoad()">
+          <div id="mon-custom-wrap" style="display:none;margin-top:4px;display:none;gap:4px;align-items:center">
+            <input type="number" id="mon-hours-custom" min="1" step="1" value="30" placeholder="숫자"
+              style="width:64px;padding:5px 8px;border:1px solid var(--border-md);border-radius:7px;font-family:inherit;font-size:12px;outline:none"
+              onchange="monLoad()">
+            <select id="mon-custom-unit" style="padding:5px 7px;border:1px solid var(--border-md);border-radius:7px;font-family:inherit;font-size:12px;outline:none" onchange="monLoad()">
+              <option value="min">분</option>
+              <option value="hour">시간</option>
+            </select>
+          </div>
         </div>
         <div>
           <div style="font-size:10px;color:var(--text-sm);font-weight:600;margin-bottom:2px">자동갱신</div>
@@ -3144,13 +3150,29 @@ function monInitIfNeeded() {
 
 function monHours() {
   const sel = document.getElementById('mon-hours').value;
-  if (sel === 'custom') return parseFloat(document.getElementById('mon-hours-custom').value) || 1;
+  if (sel === 'custom') {
+    const val = parseFloat(document.getElementById('mon-hours-custom').value) || 30;
+    const unit = document.getElementById('mon-custom-unit').value;
+    return unit === 'min' ? val / 60 : val;
+  }
   return parseFloat(sel) || 1;
 }
 function monHoursChange() {
   const isCustom = document.getElementById('mon-hours').value === 'custom';
-  document.getElementById('mon-hours-custom').style.display = isCustom ? 'block' : 'none';
+  document.getElementById('mon-custom-wrap').style.display = isCustom ? 'flex' : 'none';
   if (!isCustom) monLoad();
+}
+
+function monAutoUnit(ys) {
+  const max = Math.max(...ys.filter(v => v != null && !isNaN(v)));
+  if (max >= 1e6) return { scale: 1e6, unit: 'MΩ' };
+  if (max >= 1e3) return { scale: 1e3, unit: 'kΩ' };
+  return { scale: 1, unit: 'Ω' };
+}
+function monFmtVal(val, scale, unit) {
+  if (val == null || isNaN(val)) return '─';
+  const v = val / scale;
+  return v.toLocaleString('ko-KR', {maximumFractionDigits: 3}) + ' ' + unit;
 }
 
 function monSetStatus(msg, color) {
@@ -3158,11 +3180,11 @@ function monSetStatus(msg, color) {
   if(el) { el.textContent = msg; el.style.color = color || 'var(--text-sm)'; }
 }
 
-function monMiniLayout() {
+function monMiniLayout(unit) {
   return {
     margin:{t:8,b:36,l:62,r:8},
     xaxis:{showgrid:true,gridcolor:'#f1f3f5',tickfont:{size:10}},
-    yaxis:{title:'Ω',showgrid:true,gridcolor:'#f1f3f5',tickfont:{size:10},titlefont:{size:11}},
+    yaxis:{title:unit||'Ω',showgrid:true,gridcolor:'#f1f3f5',tickfont:{size:10},titlefont:{size:11}},
     hovermode:'x', plot_bgcolor:'#fff', paper_bgcolor:'#fff',
     font:{family:'Inter, Noto Sans KR, sans-serif', size:10},
     showlegend:false
@@ -3172,7 +3194,10 @@ function monMiniLayout() {
 function monRenderCard(cardId, name, color, xs, ys, lastVal, lastTime) {
   const card = document.getElementById(cardId);
   if (!card) return;
-  const valStr = lastVal != null ? Number(lastVal).toLocaleString() + ' Ω' : '─';
+  const numYs = ys.map(v => parseFloat(v)).filter(v => !isNaN(v));
+  const {scale, unit} = numYs.length ? monAutoUnit(numYs) : {scale:1, unit:'Ω'};
+  const scaledYs = ys.map(v => v != null ? parseFloat(v) / scale : null);
+  const valStr = monFmtVal(lastVal, scale, unit);
   card.innerHTML = `
     <div style="padding:10px 14px 6px;border-bottom:1px solid var(--border);display:flex;align-items:baseline;gap:6px;flex-wrap:wrap">
       <span style="font-size:12px;font-weight:700;color:${color}">${name}</span>
@@ -3181,9 +3206,9 @@ function monRenderCard(cardId, name, color, xs, ys, lastVal, lastTime) {
     </div>
     <div id="${cardId}-plot" style="height:190px"></div>`;
   Plotly.react(`${cardId}-plot`,
-    [{ x:xs, y:ys, type:'scatter', mode:'lines', line:{color, width:2},
-       hovertemplate:`%{x}<br>${name}: %{y:.0f} Ω<extra></extra>` }],
-    monMiniLayout(), {responsive:true, displaylogo:false});
+    [{ x:xs, y:scaledYs, type:'scatter', mode:'lines', line:{color, width:2},
+       hovertemplate:`%{x}<br>${name}: %{y:.3f} ${unit}<extra></extra>` }],
+    monMiniLayout(unit), {responsive:true, displaylogo:false});
 }
 
 async function monLoadNCS() {
